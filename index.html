@@ -189,14 +189,13 @@
         async function loadMasterData() {
             document.getElementById("syncStatus").innerText = "🔄 Loading from data.json...";
             try {
-                // Direct relative fetch (No GitHub token or API limits)
-                const res = await fetch('./data.json?v=' + Date.now());
+                const res = await fetch('./data.json');
                 rawBaseData = await res.json();
-                document.getElementById("syncStatus").innerText = `✅ Data Loaded (${rawBaseData.doctors.length} Doctors, ${rawBaseData.formulas.length} Salts)`;
+                document.getElementById("syncStatus").innerText = `✅ Loaded (${rawBaseData.doctors.length} Doctors, ${rawBaseData.formulas.length} Salts)`;
                 prepareDataset();
             } catch (err) {
                 console.error(err);
-                document.getElementById("syncStatus").innerText = "⚠️ Reading local storage...";
+                document.getElementById("syncStatus").innerText = "⚠️ Local Mode";
                 prepareDataset();
             }
         }
