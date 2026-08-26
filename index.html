@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SGM Master Doctors & Formulas Directory</title>
+    <title>SGM Master Doctors & Drug Directory</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -182,7 +182,7 @@
     <!-- PIN SECURITY SCREEN -->
     <div class="pin-overlay" id="pinScreen">
         <div class="pin-card">
-            <h2>🔒 SGM Directory</h2>
+            <h2>🔒 SGM Master Directory</h2>
             <p>Authorized Access Only</p>
             <form onsubmit="verifyPIN(event)">
                 <input type="password" id="pinInput" class="pin-input" maxlength="6" placeholder="PIN" autofocus>
@@ -200,7 +200,7 @@
             
             <div class="nav-switch">
                 <button class="nav-btn active" id="btnDoc" onclick="switchTab('DOCTORS')">👨‍⚕️ Doctors Directory</button>
-                <button class="nav-btn" id="btnForm" onclick="switchTab('FORMULAS')">🧪 Formulas Directory</button>
+                <button class="nav-btn" id="btnForm" onclick="switchTab('FORMULAS')">🧪 Drug Formulations (Salts)</button>
             </div>
         </div>
 
@@ -262,7 +262,7 @@
             }
         }
 
-        // FULL SPECIALISTS MAPPING LIST
+        // DOCTORS CATEGORIES (Medical Specialties)
         const docCategories = {
             "SKIN": { name: "Skin & Dermatology", icon: "✨", color: "#9333ea" },
             "CARDIO": { name: "Cardiology (Heart)", icon: "❤️", color: "#dc2626" },
@@ -279,25 +279,28 @@
             "MBBS": { name: "General (MBBS)", icon: "👨‍⚕️", color: "#0d9488" },
             "HOMEO": { name: "Homeopathy", icon: "🌿", color: "#16a34a" },
             "AYUR": { name: "Ayurvedic", icon: "🍃", color: "#65a30d" },
-            "HOSPITAL": { name: "Hospitals & Polyclinics", icon: "🏥", color: "#b91c1c" },
+            "HOSPITAL": { name: "Hospitals & Clinics", icon: "🏥", color: "#b91c1c" },
             "OTHER": { name: "Specialist Consultants", icon: "📋", color: "#4b5563" }
         };
 
+        // DRUG CLASSIFICATIONS (Pharmacological Classes)
         const formulaCategories = {
-            "DERMA": { name: "Dermatology & Skin", icon: "✨", color: "#9333ea" },
-            "DIABETES": { name: "Diabetes (Sugar)", icon: "🩸", color: "#dc2626" },
-            "CARDIAC": { name: "Cardiac & BP", icon: "❤️", color: "#e11d48" },
-            "ANTIBIOTIC": { name: "Antibiotics", icon: "🦠", color: "#0284c7" },
-            "PAIN": { name: "Pain Relief & NSAID", icon: "💊", color: "#d97706" },
-            "GASTRO": { name: "Gastro & Antacid", icon: "🧪", color: "#059669" },
-            "RESPIRATORY": { name: "Cough, Cold & Asthma", icon: "🫁", color: "#0891b2" },
-            "NEURO": { name: "Neuro & Spine", icon: "🧠", color: "#7c3aed" },
-            "ORTHO": { name: "Bone, Calcium & Joint", icon: "🦴", color: "#ea580c" },
-            "VITAMIN": { name: "Vitamins & Minerals", icon: "✨", color: "#16a34a" },
-            "GYNEC": { name: "Gynecology Care", icon: "🤰", color: "#be185d" },
-            "UROLOGY": { name: "Urology & Kidney", icon: "💧", color: "#0284c7" },
-            "EYE_ENT": { name: "Eye & ENT Drops", icon: "👁️", color: "#2563eb" },
-            "OTHER": { name: "General Salts", icon: "📋", color: "#4b5563" }
+            "ANTIDIABETIC": { name: "Antidiabetic Drugs", icon: "🩸", color: "#dc2626" },
+            "CARDIOVASCULAR": { name: "Cardiovascular & Antihypertensive", icon: "❤️", color: "#e11d48" },
+            "ANTIBIOTIC": { name: "Antibiotics & Antibacterials", icon: "🦠", color: "#0284c7" },
+            "ANTIFUNGAL_ANTIVIRAL": { name: "Antifungals & Antivirals", icon: "🍄", color: "#7c3aed" },
+            "ANALGESIC_NSAID": { name: "Analgesics, NSAIDs & Relaxants", icon: "💊", color: "#d97706" },
+            "GASTROINTESTINAL": { name: "Gastrointestinal & Antacids", icon: "🧪", color: "#059669" },
+            "RESPIRATORY_ANTIALLE": { name: "Respiratory, Cough & Antiallergic", icon: "🫁", color: "#0891b2" },
+            "CNS_NEURO": { name: "Neuropsychiatric & CNS Agents", icon: "🧠", color: "#6366f1" },
+            "DERMATOLOGICAL": { name: "Topical & Skin Formulations", icon: "🧴", color: "#9333ea" },
+            "BONE_CALCIUM": { name: "Calcium & Bone Supplements", icon: "🦴", color: "#ea580c" },
+            "VITAMINS_MINERALS": { name: "Multivitamins & Minerals", icon: "✨", color: "#16a34a" },
+            "HORMONAL_GYNEC": { name: "Hormonal & Gynecology Drugs", icon: "🤰", color: "#be185d" },
+            "UROLOGICAL": { name: "Urological & Renal Formulations", icon: "💧", color: "#0284c7" },
+            "OPHTHALMIC_OTIC": { name: "Eye & Ear Preparations", icon: "👁️", color: "#2563eb" },
+            "ONCOLOGY": { name: "Oncology & Immunosuppressants", icon: "🎗️", color: "#475569" },
+            "OTHER_DRUGS": { name: "Other Therapeutic Salts", icon: "📋", color: "#64748b" }
         };
 
         let activeTab = 'DOCTORS';
@@ -308,7 +311,6 @@
         async function loadMasterData() {
             document.getElementById("syncStatus").innerText = "🔄 Fetching latest data.json...";
             try {
-                // Prevent mobile APK caching via timestamp & no-store
                 const res = await fetch('./data.json?t=' + new Date().getTime(), { cache: 'no-store' });
                 rawBaseData = await res.json();
                 document.getElementById("syncStatus").innerText = `✅ Loaded (${rawBaseData.doctors.length} Doctors, ${rawBaseData.formulas.length} Salts)`;
@@ -376,7 +378,7 @@
             let html = '';
 
             activeList.forEach(item => {
-                let meta = metaMap[item.cat_key] || metaMap["OTHER"];
+                let meta = metaMap[item.cat_key] || metaMap[activeTab === 'DOCTORS' ? "OTHER" : "OTHER_DRUGS"];
                 let searchStr = (activeTab === 'DOCTORS' ? `${item.display_name} ${item.raw_name_qual} ${meta.name} ${item.address} ${item.phone}` : `${item.formula_name} ${meta.name}`).toLowerCase();
                 let delBtn = item.is_custom ? `<button class="action-btn" onclick="deleteItem('${item.id}')">🗑️</button>` : '';
 
@@ -452,7 +454,7 @@
                 document.getElementById("dynamicInputs").innerHTML = `
                     <label style="font-size:12px; font-weight:700;">Doctor Name:</label><input id="mName" class="form-control" required placeholder="Dr. ...">
                     <label style="font-size:12px; font-weight:700;">Degree / Qual:</label><input id="mQual" class="form-control" required placeholder="MBBS/BDS/MD">
-                    <label style="font-size:12px; font-weight:700;">Category:</label><select id="mCat" class="form-control">${opt}</select>
+                    <label style="font-size:12px; font-weight:700;">Specialty Category:</label><select id="mCat" class="form-control">${opt}</select>
                     <label style="font-size:12px; font-weight:700;">Clinic Address & Phone:</label>
                     <input id="mAddr" class="form-control" placeholder="Clinic Name, Gondia">
                     <input id="mPhone" class="form-control" placeholder="Phone Number">
@@ -460,7 +462,7 @@
             } else {
                 document.getElementById("dynamicInputs").innerHTML = `
                     <label style="font-size:12px; font-weight:700;">Formula / Salt Name:</label><input id="mName" class="form-control" required placeholder="e.g. PARACETAMOL 500MG">
-                    <label style="font-size:12px; font-weight:700;">Category:</label><select id="mCat" class="form-control">${opt}</select>
+                    <label style="font-size:12px; font-weight:700;">Drug Class / Category:</label><select id="mCat" class="form-control">${opt}</select>
                 `;
             }
             document.getElementById("modalBox").style.display = "flex";
@@ -480,7 +482,7 @@
                 document.getElementById("dynamicInputs").innerHTML = `
                     <label style="font-size:12px; font-weight:700;">Doctor Name:</label><input id="mName" class="form-control" required value="${item.display_name}">
                     <label style="font-size:12px; font-weight:700;">Degree / Qual:</label><input id="mQual" class="form-control" required value="${item.raw_name_qual}">
-                    <label style="font-size:12px; font-weight:700;">Category:</label><select id="mCat" class="form-control">${opt}</select>
+                    <label style="font-size:12px; font-weight:700;">Specialty Category:</label><select id="mCat" class="form-control">${opt}</select>
                     <label style="font-size:12px; font-weight:700;">Clinic Address & Phone:</label>
                     <input id="mAddr" class="form-control" value="${item.address||''}">
                     <input id="mPhone" class="form-control" value="${item.phone||''}">
@@ -488,7 +490,7 @@
             } else {
                 document.getElementById("dynamicInputs").innerHTML = `
                     <label style="font-size:12px; font-weight:700;">Formula / Salt Name:</label><input id="mName" class="form-control" required value="${item.formula_name}">
-                    <label style="font-size:12px; font-weight:700;">Category:</label><select id="mCat" class="form-control">${opt}</select>
+                    <label style="font-size:12px; font-weight:700;">Drug Class / Category:</label><select id="mCat" class="form-control">${opt}</select>
                 `;
             }
             document.getElementById("modalBox").style.display = "flex";
