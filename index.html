@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SGM Live Master Portal</title>
+    <title>SGM Master Doctors & Formulas Directory</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
     <style>
         :root {
@@ -18,7 +18,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
         body { background-color: var(--bg); color: var(--text-main); padding-bottom: 50px; user-select: text; }
         
-        /* PIN LOCK SCREEN */
+        /* PIN LOCK */
         .pin-overlay {
             position: fixed;
             top: 0; left: 0; width: 100vw; height: 100vh;
@@ -61,12 +61,10 @@
             border: none;
             border-radius: 10px;
             cursor: pointer;
-            transition: all 0.2s;
         }
-        .btn-unlock:hover { background: #0369a1; }
         .error-msg { color: #dc2626; font-size: 12.5px; font-weight: 700; margin-top: 10px; display: none; }
 
-        /* PORTAL STYLING */
+        /* PORTAL */
         #portalContent { display: none; }
         .header {
             background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
@@ -94,9 +92,10 @@
         .nav-btn.active { background: white; color: #0f172a; }
 
         .main-container { max-width: 1400px; margin: 18px auto 0 auto; padding: 0 16px; }
-        .top-bar { display: flex; gap: 10px; margin-bottom: 14px; }
+        .top-bar { display: flex; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
         .search-input {
             flex: 1;
+            min-width: 250px;
             padding: 10px 16px;
             font-size: 15px;
             font-weight: 600;
@@ -106,17 +105,28 @@
             background: var(--card-bg);
         }
         .search-input:focus { border-color: #0284c7; background: #fff; }
+        
+        .btn-action-group { display: flex; gap: 8px; }
         .btn-add {
             background: #059669;
             color: white;
             border: none;
             border-radius: 10px;
-            padding: 0 18px;
+            padding: 0 16px;
             font-weight: 700;
             cursor: pointer;
             white-space: nowrap;
         }
-        .btn-add:hover { background: #047857; }
+        .btn-sync {
+            background: #0284c7;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            padding: 0 14px;
+            font-weight: 700;
+            cursor: pointer;
+            white-space: nowrap;
+        }
 
         .chips-bar { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 10px; margin-bottom: 16px; }
         .chips-bar::-webkit-scrollbar { height: 5px; }
@@ -196,8 +206,11 @@
 
         <div class="main-container">
             <div class="top-bar">
-                <input type="text" id="mainSearch" class="search-input" onkeyup="applyFilters()" placeholder="🔍 Type to search instantly...">
-                <button class="btn-add" id="btnAdd" onclick="openAddModal()">➕ Add Doctor</button>
+                <input type="text" id="mainSearch" class="search-input" onkeyup="applyFilters()" placeholder="🔍 Type to search instantly..." autofocus>
+                <div class="btn-action-group">
+                    <button class="btn-add" id="btnAdd" onclick="openAddModal()">➕ Add Doctor</button>
+                    <button class="btn-sync" onclick="forceReloadCloud()">🔄 Reload Cloud</button>
+                </div>
             </div>
 
             <div class="chips-bar" id="chipsBar"></div>
@@ -221,7 +234,6 @@
     </div>
 
     <script>
-        // --- 1. PIN SECURITY LOGIC ---
         const CORRECT_PIN = "1441";
 
         function checkAuth() {
@@ -250,30 +262,41 @@
             }
         }
 
-        // --- 2. DATA & DIRECTORY LOGIC ---
+        // FULL SPECIALISTS MAPPING LIST
         const docCategories = {
-            "CARDIO": { name: "Cardiology", icon: "❤️", color: "#dc2626" },
-            "DENTAL": { name: "Dental", icon: "🦷", color: "#0284c7" },
-            "NEURO": { name: "Neuro", icon: "🧠", color: "#7c3aed" },
-            "PEDIATRIC": { name: "Pediatric", icon: "👶", color: "#db2777" },
-            "ENT": { name: "ENT", icon: "👂", color: "#ea580c" },
-            "ORTHO": { name: "Orthopedics", icon: "🦴", color: "#d97706" },
-            "PHYSICIAN": { name: "Physician", icon: "🩺", color: "#059669" },
+            "SKIN": { name: "Skin & Dermatology", icon: "✨", color: "#9333ea" },
+            "CARDIO": { name: "Cardiology (Heart)", icon: "❤️", color: "#dc2626" },
+            "DENTAL": { name: "Dental (Dentist)", icon: "🦷", color: "#0284c7" },
+            "NEURO": { name: "Neurology & Spine", icon: "🧠", color: "#7c3aed" },
+            "PEDIATRIC": { name: "Pediatric (Child)", icon: "👶", color: "#db2777" },
+            "ENT": { name: "ENT (Ear/Nose/Throat)", icon: "👂", color: "#ea580c" },
+            "ORTHO": { name: "Orthopedics (Bone)", icon: "🦴", color: "#d97706" },
+            "GYNEC": { name: "Gynecology (Maternity)", icon: "🤰", color: "#be185d" },
+            "RADIO": { name: "Radiology & Sonography", icon: "🩻", color: "#475569" },
+            "EYE": { name: "Eye (Ophthalmology)", icon: "👁️", color: "#2563eb" },
+            "UROLOGY": { name: "Urology & Kidney", icon: "💧", color: "#0284c7" },
+            "PHYSICIAN": { name: "MD Physician (Medicine)", icon: "🩺", color: "#059669" },
             "MBBS": { name: "General (MBBS)", icon: "👨‍⚕️", color: "#0d9488" },
-            "OTHER": { name: "Specialists", icon: "📋", color: "#4b5563" }
+            "HOMEO": { name: "Homeopathy", icon: "🌿", color: "#16a34a" },
+            "AYUR": { name: "Ayurvedic", icon: "🍃", color: "#65a30d" },
+            "HOSPITAL": { name: "Hospitals & Polyclinics", icon: "🏥", color: "#b91c1c" },
+            "OTHER": { name: "Specialist Consultants", icon: "📋", color: "#4b5563" }
         };
 
         const formulaCategories = {
-            "DIABETES": { name: "Diabetes", icon: "🩸", color: "#dc2626" },
+            "DERMA": { name: "Dermatology & Skin", icon: "✨", color: "#9333ea" },
+            "DIABETES": { name: "Diabetes (Sugar)", icon: "🩸", color: "#dc2626" },
             "CARDIAC": { name: "Cardiac & BP", icon: "❤️", color: "#e11d48" },
             "ANTIBIOTIC": { name: "Antibiotics", icon: "🦠", color: "#0284c7" },
-            "PAIN": { name: "Pain Relief", icon: "💊", color: "#d97706" },
-            "GASTRO": { name: "Gastro", icon: "🧪", color: "#059669" },
-            "RESPIRATORY": { name: "Cough & Cold", icon: "🫁", color: "#0891b2" },
-            "NEURO": { name: "Neuro", icon: "🧠", color: "#7c3aed" },
-            "DERMA": { name: "Dermatology", icon: "🧴", color: "#9333ea" },
-            "ORTHO": { name: "Bone & Joint", icon: "🦴", color: "#ea580c" },
-            "VITAMIN": { name: "Vitamins", icon: "✨", color: "#16a34a" },
+            "PAIN": { name: "Pain Relief & NSAID", icon: "💊", color: "#d97706" },
+            "GASTRO": { name: "Gastro & Antacid", icon: "🧪", color: "#059669" },
+            "RESPIRATORY": { name: "Cough, Cold & Asthma", icon: "🫁", color: "#0891b2" },
+            "NEURO": { name: "Neuro & Spine", icon: "🧠", color: "#7c3aed" },
+            "ORTHO": { name: "Bone, Calcium & Joint", icon: "🦴", color: "#ea580c" },
+            "VITAMIN": { name: "Vitamins & Minerals", icon: "✨", color: "#16a34a" },
+            "GYNEC": { name: "Gynecology Care", icon: "🤰", color: "#be185d" },
+            "UROLOGY": { name: "Urology & Kidney", icon: "💧", color: "#0284c7" },
+            "EYE_ENT": { name: "Eye & ENT Drops", icon: "👁️", color: "#2563eb" },
             "OTHER": { name: "General Salts", icon: "📋", color: "#4b5563" }
         };
 
@@ -283,17 +306,23 @@
         let activeList = [];
 
         async function loadMasterData() {
-            document.getElementById("syncStatus").innerText = "🔄 Loading from data.json...";
+            document.getElementById("syncStatus").innerText = "🔄 Fetching latest data.json...";
             try {
-                const res = await fetch('./data.json?v=' + Date.now());
+                // Prevent mobile APK caching via timestamp & no-store
+                const res = await fetch('./data.json?t=' + new Date().getTime(), { cache: 'no-store' });
                 rawBaseData = await res.json();
-                document.getElementById("syncStatus").innerText = `✅ Loaded (${rawBaseData.doctors.length} Docs, ${rawBaseData.formulas.length} Salts)`;
+                document.getElementById("syncStatus").innerText = `✅ Loaded (${rawBaseData.doctors.length} Doctors, ${rawBaseData.formulas.length} Salts)`;
                 prepareDataset();
             } catch (err) {
                 console.error(err);
                 document.getElementById("syncStatus").innerText = "⚠️ Local Storage Mode";
                 prepareDataset();
             }
+        }
+
+        function forceReloadCloud() {
+            localStorage.clear();
+            loadMasterData();
         }
 
         function prepareDataset() {
@@ -348,24 +377,24 @@
 
             activeList.forEach(item => {
                 let meta = metaMap[item.cat_key] || metaMap["OTHER"];
-                let searchStr = (activeTab === 'DOCTORS' ? `${item.display_name} ${item.raw_name_qual} ${item.address} ${item.phone}` : item.formula_name).toLowerCase();
+                let searchStr = (activeTab === 'DOCTORS' ? `${item.display_name} ${item.raw_name_qual} ${meta.name} ${item.address} ${item.phone}` : `${item.formula_name} ${meta.name}`).toLowerCase();
                 let delBtn = item.is_custom ? `<button class="action-btn" onclick="deleteItem('${item.id}')">🗑️</button>` : '';
 
                 if (activeTab === 'DOCTORS') {
                     html += `
                     <div class="item-card" data-cat="${item.cat_key}" data-search="${searchStr}" style="border-left-color: ${meta.color};">
                         <div class="card-controls">
-                            <button class="action-btn" onclick="openEditModal('${item.id}')">✏️</button>
+                            <button class="action-btn" onclick="openEditModal('${item.id}')">✏️ Edit</button>
                             ${delBtn}
                         </div>
                         <div>
                             <div class="card-header">
                                 <span class="card-id">ID: ${item.id}</span>
-                                <span style="font-size:11.5px; font-weight:700;">${meta.icon} ${meta.name}</span>
+                                <span style="font-size:11.5px; font-weight:700;">${meta.icon} ${meta.name.split(' ')[0]}</span>
                             </div>
                             <div class="card-title">${item.display_name}</div>
                             <div class="card-sub">📋 ${item.raw_name_qual || '-'}</div>
-                            <div class="card-info">📍 ${item.address || 'Gondia'}</div>
+                            <div class="card-info">📍 <span>${item.address || 'Gondia'}</span></div>
                             <div class="card-info">📞 <b>${item.phone || '-'}</b></div>
                         </div>
                     </div>`;
@@ -373,7 +402,7 @@
                     html += `
                     <div class="item-card" data-cat="${item.cat_key}" data-search="${searchStr}" style="border-left-color: ${meta.color};">
                         <div class="card-controls">
-                            <button class="action-btn" onclick="openEditModal('${item.id}')">✏️</button>
+                            <button class="action-btn" onclick="openEditModal('${item.id}')">✏️ Edit</button>
                             ${delBtn}
                         </div>
                         <div>
@@ -422,7 +451,7 @@
             if (activeTab === 'DOCTORS') {
                 document.getElementById("dynamicInputs").innerHTML = `
                     <label style="font-size:12px; font-weight:700;">Doctor Name:</label><input id="mName" class="form-control" required placeholder="Dr. ...">
-                    <label style="font-size:12px; font-weight:700;">Degree / Qual:</label><input id="mQual" class="form-control" required placeholder="MBBS/BDS">
+                    <label style="font-size:12px; font-weight:700;">Degree / Qual:</label><input id="mQual" class="form-control" required placeholder="MBBS/BDS/MD">
                     <label style="font-size:12px; font-weight:700;">Category:</label><select id="mCat" class="form-control">${opt}</select>
                     <label style="font-size:12px; font-weight:700;">Clinic Address & Phone:</label>
                     <input id="mAddr" class="form-control" placeholder="Clinic Name, Gondia">
