@@ -18,7 +18,7 @@
         * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
         body { background-color: var(--bg); color: var(--text-main); padding-bottom: 50px; user-select: text; }
         
-        /* PIN LOCK */
+        /* PIN LOCK SCREEN */
         .pin-overlay {
             position: fixed;
             top: 0; left: 0; width: 100vw; height: 100vh;
@@ -64,7 +64,7 @@
         }
         .error-msg { color: #dc2626; font-size: 12.5px; font-weight: 700; margin-top: 10px; display: none; }
 
-        /* PORTAL */
+        /* MAIN PORTAL */
         #portalContent { display: none; }
         .header {
             background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
@@ -162,7 +162,7 @@
         }
         .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
         .card-id { font-size: 11px; font-weight: 800; color: #0284c7; background: #e0f2fe; padding: 2px 6px; border-radius: 4px; }
-        .card-title { font-size: 15.5px; font-weight: 800; margin-bottom: 4px; padding-right: 50px; }
+        .card-title { font-size: 15.5px; font-weight: 800; margin-bottom: 4px; padding-right: 65px; }
         .card-sub { font-size: 13px; font-weight: 700; color: #1e3a8a; margin-bottom: 6px; }
         .card-info { font-size: 12.5px; color: var(--text-sub); margin-top: 3px; }
 
@@ -179,7 +179,7 @@
 </head>
 <body>
 
-    <!-- PIN SECURITY SCREEN -->
+    <!-- PIN LOCK SCREEN -->
     <div class="pin-overlay" id="pinScreen">
         <div class="pin-card">
             <h2>🔒 SGM Master Directory</h2>
@@ -196,7 +196,7 @@
     <div id="portalContent">
         <div class="header" id="mainHeader">
             <h1>🏥 Shree Ganesh Medicals — Master Lookup Portal</h1>
-            <div class="sync-badge" id="syncStatus">🔄 Loading Database...</div>
+            <div class="sync-badge" id="syncStatus">🔄 Connecting to GitHub Cloud...</div>
             
             <div class="nav-switch">
                 <button class="nav-btn active" id="btnDoc" onclick="switchTab('DOCTORS')">👨‍⚕️ Doctors Directory</button>
@@ -209,7 +209,7 @@
                 <input type="text" id="mainSearch" class="search-input" onkeyup="applyFilters()" placeholder="🔍 Type to search instantly..." autofocus>
                 <div class="btn-action-group">
                     <button class="btn-add" id="btnAdd" onclick="openAddModal()">➕ Add Doctor</button>
-                    <button class="btn-sync" onclick="loadMasterData()">🔄 Reload Cloud</button>
+                    <button class="btn-sync" onclick="loadMasterData(true)">🔄 Reload Cloud</button>
                 </div>
             </div>
 
@@ -236,10 +236,10 @@
     <script>
         const CORRECT_PIN = "1441";
         
-        // GITHUB CLOUD REPO CONFIG
+        // GITHUB CONFIGURATION WITH CLASSIC TOKEN
         const GITHUB_USERNAME = "TechIsInMyDNA";
         const REPO_NAME = "SGM-LIVE-PORTAL-DOC-AND-FORMU";
-        const GH_TOKEN = "github_pat_11BIQO44Q0RYTpZtGzvzg_zQuuGOSXhGQzObQk20MmoyksKjHQ4UtigINPhu8uB8EEYIPOFA2KvUU9";
+        const GH_TOKEN = "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";
 
         let currentFileSha = null;
 
@@ -269,7 +269,6 @@
             }
         }
 
-        // DOCTORS CATEGORIES
         const docCategories = {
             "SKIN": { name: "Skin & Dermatology", icon: "✨", color: "#9333ea" },
             "CARDIO": { name: "Cardiology (Heart)", icon: "❤️", color: "#dc2626" },
@@ -290,7 +289,6 @@
             "OTHER": { name: "Specialist Consultants", icon: "📋", color: "#4b5563" }
         };
 
-        // DRUG CLASSIFICATIONS
         const formulaCategories = {
             "ANTIDIABETIC": { name: "Antidiabetic Drugs", icon: "🩸", color: "#dc2626" },
             "CARDIOVASCULAR": { name: "Cardiovascular & Antihypertensive", icon: "❤️", color: "#e11d48" },
@@ -314,68 +312,73 @@
         let currentFilter = 'ALL';
         let globalData = { doctors: [], formulas: [] };
 
-        async function loadMasterData() {
-            document.getElementById("syncStatus").innerText = "🔄 Loading GitHub Cloud...";
+        async function loadMasterData(isManual = false) {
+            document.getElementById("syncStatus").innerText = "🔄 Syncing with GitHub Cloud...";
             try {
-                // Direct GitHub raw fetch with cache buster
-                const rawUrl = `https://raw.githubusercontent.com/${GITHUB_USERNAME}/${REPO_NAME}/main/data.json?t=` + new Date().getTime();
-                const res = await fetch(rawUrl, { cache: 'no-store' });
-                globalData = await res.json();
-                
-                // Get File SHA for saving
-                fetchSha();
-                
-                document.getElementById("syncStatus").innerText = `✅ Live Cloud Synced (${globalData.doctors.length} Doctors, ${globalData.formulas.length} Salts)`;
+                const apiRes = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/data.json?t=` + new Date().getTime(), {
+                    headers: { "Authorization": `token ${GH_TOKEN}`, "Accept": "application/vnd.github+json" }
+                });
+
+                if (apiRes.ok) {
+                    const j = await apiRes.json();
+                    currentFileSha = j.sha;
+                    const contentStr = decodeURIComponent(escape(atob(j.content)));
+                    globalData = JSON.parse(contentStr);
+                } else {
+                    const rawUrl = `https://raw.githubusercontent.com/${GITHUB_USERNAME}/${REPO_NAME}/main/data.json?t=` + new Date().getTime();
+                    const rawRes = await fetch(rawUrl, { cache: 'no-store' });
+                    globalData = await rawRes.json();
+                }
+
+                document.getElementById("syncStatus").innerText = `✅ Live Cloud Synced (${globalData.doctors.length} Docs, ${globalData.formulas.length} Salts)`;
                 renderUI();
+                if (isManual) alert("Data reloaded successfully from GitHub!");
             } catch (err) {
                 console.error(err);
-                document.getElementById("syncStatus").innerText = "⚠️ Network Error";
+                document.getElementById("syncStatus").innerText = "⚠️ Network Mode";
             }
         }
 
-        async function fetchSha() {
+        async function syncToGitHub() {
+            document.getElementById("syncStatus").innerText = "⏳ Saving permanently to GitHub...";
             try {
                 const apiRes = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/data.json`, {
-                    headers: { "Authorization": `Bearer ${GH_TOKEN}`, "Accept": "application/vnd.github+json" }
+                    headers: { "Authorization": `token ${GH_TOKEN}`, "Accept": "application/vnd.github+json" }
                 });
                 if (apiRes.ok) {
                     const j = await apiRes.json();
                     currentFileSha = j.sha;
                 }
-            } catch(e) {}
-        }
 
-        async function syncToGitHub() {
-            document.getElementById("syncStatus").innerText = "⏳ Saving directly to GitHub Cloud...";
-            try {
-                if (!currentFileSha) await fetchSha();
+                const jsonString = JSON.stringify(globalData, null, 2);
+                const base64Content = btoa(unescape(encodeURIComponent(jsonString)));
 
-                const contentUtf8 = unescape(encodeURIComponent(JSON.stringify(globalData, null, 2)));
-                const base64Content = btoa(contentUtf8);
-
-                const res = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/data.json`, {
+                const putRes = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/data.json`, {
                     method: "PUT",
                     headers: {
-                        "Authorization": `Bearer ${GH_TOKEN}`,
+                        "Authorization": `token ${GH_TOKEN}`,
                         "Accept": "application/vnd.github+json",
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        message: `Live update ${activeTab} from Portal`,
+                        message: `Live update ${activeTab} via Directory App`,
                         content: base64Content,
                         sha: currentFileSha
                     })
                 });
 
-                if (res.ok) {
-                    const result = await res.json();
-                    currentFileSha = result.content.sha;
-                    document.getElementById("syncStatus").innerText = "✅ Saved to Cloud! (All devices updated)";
+                if (putRes.ok) {
+                    const resJson = await putRes.json();
+                    currentFileSha = resJson.content.sha;
+                    document.getElementById("syncStatus").innerText = "✅ Saved to Cloud! Multi-device updated.";
                 } else {
-                    document.getElementById("syncStatus").innerText = "⚠️ Cloud save notice (saved locally)";
+                    const errDetail = await putRes.json();
+                    alert("GitHub Save Notice: " + (errDetail.message || "Error"));
+                    document.getElementById("syncStatus").innerText = "⚠️ Cloud save notice";
                 }
-            } catch(e) {
-                document.getElementById("syncStatus").innerText = "⚠️ Cloud save failed";
+            } catch (e) {
+                console.error(e);
+                document.getElementById("syncStatus").innerText = "⚠️ Sync Error";
             }
         }
 
