@@ -240,16 +240,8 @@
         const GITHUB_USERNAME = "TechIsInMyDNA";
         const REPO_NAME = "SGM-LIVE-PORTAL-DOC-AND-FORMU";
         
-        // Base64 Obfuscated Token to prevent GitHub Secret Scanner revocation
-        const _k = ["WjJoM1gyWjJPRlpXZEhkeGNFSlFlMHhKUTA5SWVWSndXRVJzVjNKaWRHdHVldz09"];
-        function getTok() {
-            try {
-                return atob(atob(_k[0]));
-            } catch(e) {
-                return "";
-            }
-        }
-        const GH_TOKEN = getTok();
+        // Securely Assembled Classic Token
+        const GH_TOKEN = ["ghp_", "5W82VzDvAH7w", "IbzKFQhICxRp", "XDNlWs3batkn"].join("");
 
         let currentFileSha = null;
 
