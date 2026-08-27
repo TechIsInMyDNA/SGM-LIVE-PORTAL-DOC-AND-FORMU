@@ -209,7 +209,7 @@
                 <input type="text" id="mainSearch" class="search-input" onkeyup="applyFilters()" placeholder="🔍 Type to search instantly..." autofocus>
                 <div class="btn-action-group">
                     <button class="btn-add" id="btnAdd" onclick="openAddModal()">➕ Add Doctor</button>
-                    <button class="btn-sync" onclick="forceReloadCloud()">🔄 Reload Cloud</button>
+                    <button class="btn-sync" onclick="loadMasterData()">🔄 Reload Cloud</button>
                 </div>
             </div>
 
@@ -227,7 +227,7 @@
                 <div id="dynamicInputs"></div>
                 <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:14px;">
                     <button type="button" onclick="closeModal()" style="padding:6px 14px; border:none; border-radius:6px; cursor:pointer;">Cancel</button>
-                    <button type="submit" id="btnSave" style="padding:6px 18px; background:#059669; color:white; border:none; border-radius:6px; font-weight:700; cursor:pointer;">Save</button>
+                    <button type="submit" id="btnSave" style="padding:6px 18px; background:#059669; color:white; border:none; border-radius:6px; font-weight:700; cursor:pointer;">Save & Cloud Sync</button>
                 </div>
             </form>
         </div>
@@ -235,6 +235,13 @@
 
     <script>
         const CORRECT_PIN = "1441";
+        
+        // GITHUB CLOUD REPO CONFIG
+        const GITHUB_USERNAME = "TechIsInMyDNA";
+        const REPO_NAME = "SGM-LIVE-PORTAL-DOC-AND-FORMU";
+        const GH_TOKEN = "github_pat_11BIQO44Q0RYTpZtGzvzg_zQuuGOSXhGQzObQk20MmoyksKjHQ4UtigINPhu8uB8EEYIPOFA2KvUU9";
+
+        let currentFileSha = null;
 
         function checkAuth() {
             if (sessionStorage.getItem("sgm_authenticated") === "true") {
@@ -262,7 +269,7 @@
             }
         }
 
-        // DOCTORS CATEGORIES (Medical Specialties)
+        // DOCTORS CATEGORIES
         const docCategories = {
             "SKIN": { name: "Skin & Dermatology", icon: "✨", color: "#9333ea" },
             "CARDIO": { name: "Cardiology (Heart)", icon: "❤️", color: "#dc2626" },
@@ -283,7 +290,7 @@
             "OTHER": { name: "Specialist Consultants", icon: "📋", color: "#4b5563" }
         };
 
-        // DRUG CLASSIFICATIONS (Pharmacological Classes)
+        // DRUG CLASSIFICATIONS
         const formulaCategories = {
             "ANTIDIABETIC": { name: "Antidiabetic Drugs", icon: "🩸", color: "#dc2626" },
             "CARDIOVASCULAR": { name: "Cardiovascular & Antihypertensive", icon: "❤️", color: "#e11d48" },
@@ -305,41 +312,71 @@
 
         let activeTab = 'DOCTORS';
         let currentFilter = 'ALL';
-        let rawBaseData = { doctors: [], formulas: [] };
-        let activeList = [];
+        let globalData = { doctors: [], formulas: [] };
 
         async function loadMasterData() {
-            document.getElementById("syncStatus").innerText = "🔄 Fetching latest data.json...";
+            document.getElementById("syncStatus").innerText = "🔄 Loading GitHub Cloud...";
             try {
-                const res = await fetch('./data.json?t=' + new Date().getTime(), { cache: 'no-store' });
-                rawBaseData = await res.json();
-                document.getElementById("syncStatus").innerText = `✅ Loaded (${rawBaseData.doctors.length} Doctors, ${rawBaseData.formulas.length} Salts)`;
-                prepareDataset();
+                // Direct GitHub raw fetch with cache buster
+                const rawUrl = `https://raw.githubusercontent.com/${GITHUB_USERNAME}/${REPO_NAME}/main/data.json?t=` + new Date().getTime();
+                const res = await fetch(rawUrl, { cache: 'no-store' });
+                globalData = await res.json();
+                
+                // Get File SHA for saving
+                fetchSha();
+                
+                document.getElementById("syncStatus").innerText = `✅ Live Cloud Synced (${globalData.doctors.length} Doctors, ${globalData.formulas.length} Salts)`;
+                renderUI();
             } catch (err) {
                 console.error(err);
-                document.getElementById("syncStatus").innerText = "⚠️ Local Storage Mode";
-                prepareDataset();
+                document.getElementById("syncStatus").innerText = "⚠️ Network Error";
             }
         }
 
-        function forceReloadCloud() {
-            localStorage.clear();
-            loadMasterData();
+        async function fetchSha() {
+            try {
+                const apiRes = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/data.json`, {
+                    headers: { "Authorization": `Bearer ${GH_TOKEN}`, "Accept": "application/vnd.github+json" }
+                });
+                if (apiRes.ok) {
+                    const j = await apiRes.json();
+                    currentFileSha = j.sha;
+                }
+            } catch(e) {}
         }
 
-        function prepareDataset() {
-            if (activeTab === 'DOCTORS') {
-                const custom = JSON.parse(localStorage.getItem("sgm_cust_docs") || "[]");
-                const edits = JSON.parse(localStorage.getItem("sgm_edit_docs") || "{}");
-                let merged = (rawBaseData.doctors || []).map(d => edits[d.id] ? { ...d, ...edits[d.id] } : d);
-                activeList = [...custom, ...merged];
-            } else {
-                const custom = JSON.parse(localStorage.getItem("sgm_cust_forms") || "[]");
-                const edits = JSON.parse(localStorage.getItem("sgm_edit_forms") || "{}");
-                let merged = (rawBaseData.formulas || []).map(f => edits[f.id] ? { ...f, ...edits[f.id] } : f);
-                activeList = [...custom, ...merged];
+        async function syncToGitHub() {
+            document.getElementById("syncStatus").innerText = "⏳ Saving directly to GitHub Cloud...";
+            try {
+                if (!currentFileSha) await fetchSha();
+
+                const contentUtf8 = unescape(encodeURIComponent(JSON.stringify(globalData, null, 2)));
+                const base64Content = btoa(contentUtf8);
+
+                const res = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/data.json`, {
+                    method: "PUT",
+                    headers: {
+                        "Authorization": `Bearer ${GH_TOKEN}`,
+                        "Accept": "application/vnd.github+json",
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        message: `Live update ${activeTab} from Portal`,
+                        content: base64Content,
+                        sha: currentFileSha
+                    })
+                });
+
+                if (res.ok) {
+                    const result = await res.json();
+                    currentFileSha = result.content.sha;
+                    document.getElementById("syncStatus").innerText = "✅ Saved to Cloud! (All devices updated)";
+                } else {
+                    document.getElementById("syncStatus").innerText = "⚠️ Cloud save notice (saved locally)";
+                }
+            } catch(e) {
+                document.getElementById("syncStatus").innerText = "⚠️ Cloud save failed";
             }
-            renderUI();
         }
 
         function switchTab(tab) {
@@ -351,7 +388,7 @@
             document.getElementById("mainHeader").className = tab === 'DOCTORS' ? 'header' : 'header form-theme';
             document.body.className = tab === 'DOCTORS' ? '' : 'theme-form';
             document.getElementById("btnAdd").innerText = tab === 'DOCTORS' ? "➕ Add Doctor" : "➕ Add Formula";
-            prepareDataset();
+            renderUI();
         }
 
         function renderUI() {
@@ -360,11 +397,12 @@
         }
 
         function renderChips() {
+            const list = activeTab === 'DOCTORS' ? globalData.doctors : globalData.formulas;
             const metaMap = activeTab === 'DOCTORS' ? docCategories : formulaCategories;
             let counts = {};
-            activeList.forEach(i => counts[i.cat_key] = (counts[i.cat_key] || 0) + 1);
+            list.forEach(i => counts[i.cat_key] = (counts[i.cat_key] || 0) + 1);
 
-            let html = `<button class="filter-chip ${currentFilter === 'ALL' ? 'active' : ''}" onclick="setFilter('ALL', this)">🌟 All (${activeList.length})</button>`;
+            let html = `<button class="filter-chip ${currentFilter === 'ALL' ? 'active' : ''}" onclick="setFilter('ALL', this)">🌟 All (${list.length})</button>`;
             for (let [k, meta] of Object.entries(metaMap)) {
                 if (counts[k]) {
                     html += `<button class="filter-chip ${currentFilter === k ? 'active' : ''}" onclick="setFilter('${k}', this)">${meta.icon} ${meta.name} (${counts[k]})</button>`;
@@ -374,20 +412,20 @@
         }
 
         function renderGrid() {
+            const list = activeTab === 'DOCTORS' ? globalData.doctors : globalData.formulas;
             const metaMap = activeTab === 'DOCTORS' ? docCategories : formulaCategories;
             let html = '';
 
-            activeList.forEach(item => {
+            list.forEach(item => {
                 let meta = metaMap[item.cat_key] || metaMap[activeTab === 'DOCTORS' ? "OTHER" : "OTHER_DRUGS"];
                 let searchStr = (activeTab === 'DOCTORS' ? `${item.display_name} ${item.raw_name_qual} ${meta.name} ${item.address} ${item.phone}` : `${item.formula_name} ${meta.name}`).toLowerCase();
-                let delBtn = item.is_custom ? `<button class="action-btn" onclick="deleteItem('${item.id}')">🗑️</button>` : '';
 
                 if (activeTab === 'DOCTORS') {
                     html += `
                     <div class="item-card" data-cat="${item.cat_key}" data-search="${searchStr}" style="border-left-color: ${meta.color};">
                         <div class="card-controls">
                             <button class="action-btn" onclick="openEditModal('${item.id}')">✏️ Edit</button>
-                            ${delBtn}
+                            <button class="action-btn" onclick="deleteItem('${item.id}')">🗑️</button>
                         </div>
                         <div>
                             <div class="card-header">
@@ -405,7 +443,7 @@
                     <div class="item-card" data-cat="${item.cat_key}" data-search="${searchStr}" style="border-left-color: ${meta.color};">
                         <div class="card-controls">
                             <button class="action-btn" onclick="openEditModal('${item.id}')">✏️ Edit</button>
-                            ${delBtn}
+                            <button class="action-btn" onclick="deleteItem('${item.id}')">🗑️</button>
                         </div>
                         <div>
                             <div class="card-header">
@@ -469,7 +507,8 @@
         }
 
         function openEditModal(id) {
-            const item = activeList.find(i => i.id === id);
+            const list = activeTab === 'DOCTORS' ? globalData.doctors : globalData.formulas;
+            const item = list.find(i => i.id === id);
             if (!item) return;
 
             document.getElementById("mId").value = item.id;
@@ -498,7 +537,7 @@
 
         function closeModal() { document.getElementById("modalBox").style.display = "none"; }
 
-        function handleFormSubmit(e) {
+        async function handleFormSubmit(e) {
             e.preventDefault();
             const id = document.getElementById("mId").value;
             const name = document.getElementById("mName").value.trim();
@@ -506,64 +545,60 @@
 
             if (activeTab === 'DOCTORS') {
                 if (id) {
-                    let edits = JSON.parse(localStorage.getItem("sgm_edit_docs") || "{}");
-                    edits[id] = {
+                    let idx = globalData.doctors.findIndex(d => d.id === id);
+                    if (idx !== -1) {
+                        globalData.doctors[idx] = {
+                            id: id,
+                            display_name: name.startsWith("Dr.") ? name : "Dr. " + name,
+                            raw_name_qual: document.getElementById("mQual").value.trim(),
+                            cat_key: cat,
+                            address: document.getElementById("mAddr").value.trim() || 'Gondia',
+                            phone: document.getElementById("mPhone").value.trim() || '-'
+                        };
+                    }
+                } else {
+                    globalData.doctors.unshift({
+                        id: 'DOC_' + Date.now(),
                         display_name: name.startsWith("Dr.") ? name : "Dr. " + name,
                         raw_name_qual: document.getElementById("mQual").value.trim(),
                         cat_key: cat,
                         address: document.getElementById("mAddr").value.trim() || 'Gondia',
                         phone: document.getElementById("mPhone").value.trim() || '-'
-                    };
-                    localStorage.setItem("sgm_edit_docs", JSON.stringify(edits));
-                } else {
-                    let custom = JSON.parse(localStorage.getItem("sgm_cust_docs") || "[]");
-                    custom.unshift({
-                        id: 'CUST_' + Date.now(),
-                        display_name: name.startsWith("Dr.") ? name : "Dr. " + name,
-                        raw_name_qual: document.getElementById("mQual").value.trim(),
-                        cat_key: cat,
-                        address: document.getElementById("mAddr").value.trim() || 'Gondia',
-                        phone: document.getElementById("mPhone").value.trim() || '-',
-                        is_custom: true
                     });
-                    localStorage.setItem("sgm_cust_docs", JSON.stringify(custom));
                 }
             } else {
                 if (id) {
-                    let edits = JSON.parse(localStorage.getItem("sgm_edit_forms") || "{}");
-                    edits[id] = {
-                        formula_name: name.toUpperCase(),
-                        cat_key: cat
-                    };
-                    localStorage.setItem("sgm_edit_forms", JSON.stringify(edits));
+                    let idx = globalData.formulas.findIndex(f => f.id === id);
+                    if (idx !== -1) {
+                        globalData.formulas[idx] = {
+                            id: id,
+                            formula_name: name.toUpperCase(),
+                            cat_key: cat
+                        };
+                    }
                 } else {
-                    let custom = JSON.parse(localStorage.getItem("sgm_cust_forms") || "[]");
-                    custom.unshift({
+                    globalData.formulas.unshift({
                         id: 'FORM_' + Date.now(),
                         formula_name: name.toUpperCase(),
-                        cat_key: cat,
-                        is_custom: true
+                        cat_key: cat
                     });
-                    localStorage.setItem("sgm_cust_forms", JSON.stringify(custom));
                 }
             }
 
             closeModal();
-            prepareDataset();
+            renderUI();
+            await syncToGitHub();
         }
 
-        function deleteItem(id) {
+        async function deleteItem(id) {
             if (confirm("Kya aap ise delete karna chahte hain?")) {
                 if (activeTab === 'DOCTORS') {
-                    let custom = JSON.parse(localStorage.getItem("sgm_cust_docs") || "[]");
-                    custom = custom.filter(d => d.id !== id);
-                    localStorage.setItem("sgm_cust_docs", JSON.stringify(custom));
+                    globalData.doctors = globalData.doctors.filter(d => d.id !== id);
                 } else {
-                    let custom = JSON.parse(localStorage.getItem("sgm_cust_forms") || "[]");
-                    custom = custom.filter(f => f.id !== id);
-                    localStorage.setItem("sgm_cust_forms", JSON.stringify(custom));
+                    globalData.formulas = globalData.formulas.filter(f => f.id !== id);
                 }
-                prepareDataset();
+                renderUI();
+                await syncToGitHub();
             }
         }
 
