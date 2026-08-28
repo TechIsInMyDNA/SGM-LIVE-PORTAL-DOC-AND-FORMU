@@ -1,6 +1,14 @@
 {
   "doctors": [
     {
+      "id": "DOC_1787921450225",
+      "display_name": "Dr. DR TANMAY GANDHI REGN:-2013/08/2621",
+      "raw_name_qual": "MD (MEDICINE)",
+      "cat_key": "PHYSICIAN",
+      "address": "IMMUNOCARE,3RD FLOOR,NIKALAS TOWER,OPPO.MIDAS HEIGHTS",
+      "phone": "8600013256/8600052548/7020344296"
+    },
+    {
       "id": "DOC_1787822753849",
       "display_name": "Dr. DR ANSHUL JAIN R:-2015010332",
       "raw_name_qual": "MD (DERMA)",
