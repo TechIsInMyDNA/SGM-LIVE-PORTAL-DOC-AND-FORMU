@@ -239,6 +239,7 @@
         // GITHUB CONFIGURATION
         const GITHUB_USERNAME = "TechIsInMyDNA";
         const REPO_NAME = "SGM-LIVE-PORTAL-DOC-AND-FORMU";
+        const DATA_BRANCH = "data-storage"; // Separate branch to prevent Pages auto-deploy
         
         // Securely Assembled Classic Token
         const GH_TOKEN = ["ghp_", "5W82VzDvAH7w", "IbzKFQhICxRp", "XDNlWs3batkn"].join("");
@@ -314,12 +315,52 @@
         let currentFilter = 'ALL';
         let globalData = { doctors: [], formulas: [] };
 
-        async function loadMasterData(isManual = false) {
-            document.getElementById("syncStatus").innerText = "🔄 Syncing with GitHub Cloud...";
+        // Ensure data-storage branch exists; if not, create it from main
+        async function ensureDataBranch() {
             try {
-                const apiRes = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/data.json?t=` + new Date().getTime(), {
+                const branchRes = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/branches/${DATA_BRANCH}`, {
                     headers: { "Authorization": `token ${GH_TOKEN}`, "Accept": "application/vnd.github+json" }
                 });
+                if (branchRes.status === 404) {
+                    const mainBranchRes = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/git/ref/heads/main`, {
+                        headers: { "Authorization": `token ${GH_TOKEN}`, "Accept": "application/vnd.github+json" }
+                    });
+                    if (mainBranchRes.ok) {
+                        const mainRef = await mainBranchRes.json();
+                        await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/git/refs`, {
+                            method: "POST",
+                            headers: {
+                                "Authorization": `token ${GH_TOKEN}`,
+                                "Accept": "application/vnd.github+json",
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify({
+                                ref: `refs/heads/${DATA_BRANCH}`,
+                                sha: mainRef.object.sha
+                            })
+                        });
+                    }
+                }
+            } catch(e) {
+                console.warn("Branch check error:", e);
+            }
+        }
+
+        async function loadMasterData(isManual = false) {
+            document.getElementById("syncStatus").innerText = "🔄 Syncing with Branch Cloud...";
+            await ensureDataBranch();
+            try {
+                // First try reading from the dedicated data branch
+                let apiRes = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/data.json?ref=${DATA_BRANCH}&t=` + new Date().getTime(), {
+                    headers: { "Authorization": `token ${GH_TOKEN}`, "Accept": "application/vnd.github+json" }
+                });
+
+                // Fallback to main branch if data.json is not yet created on the storage branch
+                if (!apiRes.ok) {
+                    apiRes = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/data.json?ref=main&t=` + new Date().getTime(), {
+                        headers: { "Authorization": `token ${GH_TOKEN}`, "Accept": "application/vnd.github+json" }
+                    });
+                }
 
                 if (apiRes.ok) {
                     const j = await apiRes.json();
@@ -327,14 +368,14 @@
                     const contentStr = decodeURIComponent(escape(atob(j.content)));
                     globalData = JSON.parse(contentStr);
                 } else {
-                    const rawUrl = `https://raw.githubusercontent.com/${GITHUB_USERNAME}/${REPO_NAME}/main/data.json?t=` + new Date().getTime();
+                    const rawUrl = `https://raw.githubusercontent.com/${GITHUB_USERNAME}/${REPO_NAME}/${DATA_BRANCH}/data.json?t=` + new Date().getTime();
                     const rawRes = await fetch(rawUrl, { cache: 'no-store' });
                     globalData = await rawRes.json();
                 }
 
-                document.getElementById("syncStatus").innerText = `✅ Live Cloud Synced (${globalData.doctors.length} Docs, ${globalData.formulas.length} Salts)`;
+                document.getElementById("syncStatus").innerText = `✅ Branch Synced (${globalData.doctors.length} Docs, ${globalData.formulas.length} Salts)`;
                 renderUI();
-                if (isManual) alert("Data reloaded successfully from GitHub!");
+                if (isManual) alert("Data reloaded successfully from storage branch!");
             } catch (err) {
                 console.error(err);
                 document.getElementById("syncStatus").innerText = "⚠️ Network Mode";
@@ -342,18 +383,30 @@
         }
 
         async function syncToGitHub() {
-            document.getElementById("syncStatus").innerText = "⏳ Saving permanently to GitHub...";
+            document.getElementById("syncStatus").innerText = "⏳ Saving directly to Branch...";
             try {
-                const apiRes = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/data.json`, {
+                await ensureDataBranch();
+
+                // Get latest SHA from storage branch
+                const apiRes = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/data.json?ref=${DATA_BRANCH}`, {
                     headers: { "Authorization": `token ${GH_TOKEN}`, "Accept": "application/vnd.github+json" }
                 });
                 if (apiRes.ok) {
                     const j = await apiRes.json();
                     currentFileSha = j.sha;
+                } else {
+                    currentFileSha = null;
                 }
 
                 const jsonString = JSON.stringify(globalData, null, 2);
                 const base64Content = btoa(unescape(encodeURIComponent(jsonString)));
+
+                const reqBody = {
+                    message: `Live update ${activeTab} to ${DATA_BRANCH} (Pages bypass)`,
+                    content: base64Content,
+                    branch: DATA_BRANCH
+                };
+                if (currentFileSha) reqBody.sha = currentFileSha;
 
                 const putRes = await fetch(`https://api.github.com/repos/${GITHUB_USERNAME}/${REPO_NAME}/contents/data.json`, {
                     method: "PUT",
@@ -362,17 +415,13 @@
                         "Accept": "application/vnd.github+json",
                         "Content-Type": "application/json"
                     },
-                    body: JSON.stringify({
-                        message: `Live update ${activeTab} via Directory App`,
-                        content: base64Content,
-                        sha: currentFileSha
-                    })
+                    body: JSON.stringify(reqBody)
                 });
 
                 if (putRes.ok) {
                     const resJson = await putRes.json();
                     currentFileSha = resJson.content.sha;
-                    document.getElementById("syncStatus").innerText = "✅ Saved to Cloud! Multi-device updated.";
+                    document.getElementById("syncStatus").innerText = "✅ Saved to Branch! Multi-device updated (No Pages Rebuild).";
                 } else {
                     const errDetail = await putRes.json();
                     alert("GitHub Save Notice: " + (errDetail.message || "Error"));
